@@ -40,11 +40,11 @@ func main() {
 			panic(err)
 		}
 
-		if b == '<' {
-			state = Tag
-			current.Reset()
-		} else if b == '>' {
-			state = CharData
+		if state == CharData {
+			if b == '<' {
+				state = Tag
+				current.Reset()
+			}
 		} else if state == Tag {
 			if b == '/' || b == '>' || b == ' ' {
 				if b == '>' {
@@ -52,13 +52,22 @@ func main() {
 				} else {
 					state = TagArgs
 				}
+
 				tags[current.String()] = true
 				current.Reset()
 			} else {
 				current.WriteByte(b)
 			}
+		} else if state == TagArgs {
+			if b == '>' {
+				state = CharData
+			}
+		} else {
+			panic(fmt.Sprintf("state: %v, b: `%c`", state, b))
 		}
 	}
 
-	fmt.Println(tags)
+	for tag := range tags {
+		fmt.Printf("`%s`\n", tag)
+	}
 }
