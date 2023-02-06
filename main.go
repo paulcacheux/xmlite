@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"os"
+	"time"
 
 	"github.com/DataDog/nikos/rpm/dnfv2/repo"
 	"github.com/DataDog/nikos/rpm/dnfv2/types"
@@ -20,6 +22,7 @@ func main() {
 
 	parser := xmlparser.NewXMLParser(bufio.NewReaderSize(f, 65536), "package").SkipElements([]string{"rpm:requires"}).ParseAttributesOnly("location", "checksum", "rpm:entry")
 
+	start := time.Now()
 	for pkg := range parser.Stream() {
 		if pkg.Err != nil {
 			panic(err)
@@ -58,6 +61,7 @@ func main() {
 			}
 		}
 	}
+	fmt.Printf("elapsed: %v\n", time.Since(start))
 }
 
 func safeQuery(elem *xmlparser.XMLElement, childName string) *xmlparser.XMLElement {
