@@ -2,72 +2,73 @@ package main
 
 import (
 	"bufio"
-	"fmt"
-	"io"
 	"os"
-	"strings"
+
+	"github.com/DataDog/nikos/rpm/dnfv2/repo"
+	"github.com/DataDog/nikos/rpm/dnfv2/types"
+	xmlparser "github.com/tamerh/xml-stream-parser"
 )
 
 const TEST_PATH = "./testdata/f48bc264f9ca35fa6d482a6ffb71ba5379093364-primary.xml"
-
-type State int
-
-const (
-	CharData State = iota
-	Tag
-	TagArgs
-)
 
 func main() {
 	f, err := os.Open(TEST_PATH)
 	if err != nil {
 		panic(err)
 	}
+	defer f.Close()
 
-	reader := bufio.NewReader(f)
+	parser := xmlparser.NewXMLParser(bufio.NewReaderSize(f, 65536), "package").SkipElements([]string{"rpm:requires"}).ParseAttributesOnly("location", "checksum", "rpm:entry")
 
-	var state State = CharData
-	var current strings.Builder
-
-	tags := make(map[string]bool)
-
-	for {
-		b, err := reader.ReadByte()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
+	for pkg := range parser.Stream() {
+		if pkg.Err != nil {
 			panic(err)
 		}
 
-		if state == CharData {
-			if b == '<' {
-				state = Tag
-				current.Reset()
+		arch := safeQuery(pkg, "arch").InnerText
+		location := safeQuery(pkg, "location").Attrs["href"]
+		checksumElement := safeQuery(pkg, "checksum")
+		var checksum *types.Checksum
+		if checksumElement != nil {
+			checksum = &types.Checksum{
+				Hash: checksumElement.InnerText,
+				Type: checksumElement.Attrs["type"],
 			}
-		} else if state == Tag {
-			if b == '/' || b == '>' || b == ' ' {
-				if b == '>' {
-					state = CharData
-				} else {
-					state = TagArgs
+		}
+
+		format := safeQuery(pkg, "format")
+		provides := format.Childs["rpm:provides"]
+		for _, provided := range provides {
+			entries := provided.Childs["rpm:entry"]
+			for _, provided := range entries {
+				name := provided.Attrs["name"]
+				version := types.Version{
+					Epoch: provided.Attrs["epoch"],
+					Ver:   provided.Attrs["ver"],
+					Rel:   provided.Attrs["rel"],
 				}
 
-				tags[current.String()] = true
-				current.Reset()
-			} else {
-				current.WriteByte(b)
+				_ = &repo.PkgInfo{
+					Name:     name,
+					Version:  version,
+					Arch:     arch,
+					Location: location,
+					Checksum: checksum,
+				}
 			}
-		} else if state == TagArgs {
-			if b == '>' {
-				state = CharData
-			}
-		} else {
-			panic(fmt.Sprintf("state: %v, b: `%c`", state, b))
 		}
 	}
+}
 
-	for tag := range tags {
-		fmt.Printf("`%s`\n", tag)
+func safeQuery(elem *xmlparser.XMLElement, childName string) *xmlparser.XMLElement {
+	children, ok := elem.Childs[childName]
+	if !ok {
+		return nil
 	}
+
+	if len(children) != 1 {
+		return nil
+	}
+
+	return &children[0]
 }
