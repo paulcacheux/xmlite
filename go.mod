@@ -4,16 +4,16 @@ go 1.19
 
 require (
 	github.com/DataDog/nikos v1.11.0-rc.1.0.20230118091847-a05eb44b0456
-	github.com/tamerh/xml-stream-parser v1.4.0
+	github.com/paulcacheux/xml-stream-parser v0.0.0-20230206205725-1bcbde4dd843
 )
 
 require (
 	github.com/DataDog/zstd v1.5.2 // indirect
-	github.com/antchfx/xpath v1.2.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/klauspost/compress v1.15.12 // indirect
 	github.com/sassoftware/go-rpmutils v0.2.0 // indirect
+	github.com/tamerh/xml-stream-parser v1.4.0 // indirect
 	github.com/tamerh/xpath v1.0.0 // indirect
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect

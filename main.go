@@ -8,7 +8,7 @@ import (
 
 	"github.com/DataDog/nikos/rpm/dnfv2/repo"
 	"github.com/DataDog/nikos/rpm/dnfv2/types"
-	xmlparser "github.com/tamerh/xml-stream-parser"
+	xmlparser "github.com/paulcacheux/xml-stream-parser"
 )
 
 const TEST_PATH = "./testdata/f48bc264f9ca35fa6d482a6ffb71ba5379093364-primary.xml"
