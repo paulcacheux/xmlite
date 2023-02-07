@@ -2,13 +2,14 @@ package main
 
 import (
 	"bufio"
-	"encoding/xml"
 	"fmt"
 	"log"
 	"os"
 	"runtime"
 	"runtime/pprof"
 	"time"
+
+	"github.com/paulcacheux/xmlite/xml"
 )
 
 const TEST_PATH = "./testdata/f48bc264f9ca35fa6d482a6ffb71ba5379093364-primary.xml"
