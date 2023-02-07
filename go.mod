@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/DataDog/nikos v1.11.0-rc.1.0.20230118091847-a05eb44b0456
-	github.com/paulcacheux/xml-stream-parser v0.0.0-20230206205725-1bcbde4dd843
+	github.com/paulcacheux/xml-stream-parser v0.0.0-20230206210650-30121d5d5372
 )
 
 require (
