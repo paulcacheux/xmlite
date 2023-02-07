@@ -225,6 +225,7 @@ func NewDecoder(r io.Reader) *Decoder {
 		line:     1,
 		Strict:   true,
 	}
+	d.buf.Grow(8192)
 	d.switchToReader(r)
 	return d
 }

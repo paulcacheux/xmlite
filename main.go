@@ -2,9 +2,12 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"regexp"
 	"runtime"
 	"runtime/pprof"
 	"time"
@@ -34,7 +37,9 @@ func main() {
 	}
 	defer pprof.StopCPUProfile()
 
-	reader := bufio.NewReaderSize(f, 4096*4096)
+	freader := &FilterReader{inner: f}
+	reader := bufio.NewReaderSize(freader, 1024)
+
 	decoder := xml.NewDecoder(reader)
 
 	start := time.Now()
@@ -59,4 +64,22 @@ func main() {
 	if err := pprof.WriteHeapProfile(mem); err != nil {
 		panic(fmt.Errorf("could not write memory profile: %w", err))
 	}
+}
+
+type FilterReader struct {
+	inner io.Reader
+}
+
+var re = regexp.MustCompile(`<rpm:entry\s+name="[^"]*?\([^"]*?".*?\/>`)
+
+func (fr *FilterReader) Read(p []byte) (int, error) {
+	n, err := fr.inner.Read(p)
+	if err != nil || !bytes.Contains(p, []byte("<rpm:entry")) {
+		return n, err
+	}
+
+	fixedBuf := re.ReplaceAllLiteral(p, nil)
+	resCount := len(fixedBuf)
+	copy(p[:resCount], fixedBuf)
+	return resCount, nil
 }
