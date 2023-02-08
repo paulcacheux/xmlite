@@ -61,18 +61,24 @@ type Handler interface {
 }
 
 type LiteDecoder struct {
-	reader    *bufio.Reader
+	reader    io.ByteReader
 	handler   Handler
 	peekStore int
 	buff      bytes.Buffer
 }
 
 func NewLiteDecoder(reader io.Reader, handler Handler) *LiteDecoder {
-	return &LiteDecoder{
-		reader:    bufio.NewReader(reader),
+	lt := &LiteDecoder{
 		peekStore: -1,
 		handler:   handler,
 	}
+
+	if rb, ok := reader.(io.ByteReader); ok {
+		lt.reader = rb
+	} else {
+		lt.reader = bufio.NewReaderSize(reader, 4096*4096)
+	}
+	return lt
 }
 
 func (lt *LiteDecoder) getc() (byte, error) {
