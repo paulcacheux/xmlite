@@ -47,14 +47,7 @@ func (ph *PkgHandler) EndTag(name []byte) {
 	}
 }
 
-func (ph *PkgHandler) AutoEndTag() {
-	ph.stack = ph.stack[:len(ph.stack)-1]
-}
-
-func (ph *PkgHandler) AttrName(name []byte) {
-}
-
-func (ph *PkgHandler) AttrValue(name []byte) {
+func (ph *PkgHandler) Attr(name, value []byte) {
 }
 
 func (ph *PkgHandler) CharData(value []byte) {

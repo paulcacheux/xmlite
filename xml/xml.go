@@ -11,8 +11,7 @@ import (
 type Handler interface {
 	StartTag(name []byte)
 	EndTag(name []byte)
-	AttrName(name []byte)
-	AttrValue(value []byte)
+	Attr(name, value []byte)
 	CharData(value []byte)
 }
 
@@ -20,6 +19,8 @@ type LiteDecoder struct {
 	reader    io.ByteReader
 	handler   Handler
 	peekStore int
+	nameBuff  bytes.Buffer
+	attrBuff  bytes.Buffer
 	buff      bytes.Buffer
 }
 
@@ -108,7 +109,7 @@ func (lt *LiteDecoder) NextToken() error {
 		}
 
 		// handle name
-		name, err := lt.name()
+		name, err := lt.name(false)
 		if err != nil {
 			return err
 		}
@@ -123,20 +124,19 @@ func (lt *LiteDecoder) NextToken() error {
 		// handle attributes
 		if !isEnd {
 			for !lt.isNextSlashOrRightOrErr() {
-				attrName, err := lt.name()
+				attrName, err := lt.name(true)
 				if err != nil {
 					return err
 				}
 				if err := lt.eat('='); err != nil {
 					return err
 				}
-				lt.handler.AttrName(attrName)
 
 				attrValue, err := lt.quote()
 				if err != nil {
 					return err
 				}
-				lt.handler.AttrValue(attrValue)
+				lt.handler.Attr(attrName, attrValue)
 
 				lt.space()
 			}
@@ -148,7 +148,7 @@ func (lt *LiteDecoder) NextToken() error {
 			return err
 		}
 		if autoclose {
-			// name is still valid since we skipped the parsing of attributes
+			// name is still valid since we use a different buffer
 			lt.handler.EndTag(name)
 		}
 
@@ -204,8 +204,13 @@ func (lt *LiteDecoder) eat(expected byte) error {
 	return nil
 }
 
-func (lt *LiteDecoder) name() ([]byte, error) {
-	lt.buff.Reset()
+func (lt *LiteDecoder) name(attr bool) ([]byte, error) {
+	buff := &lt.nameBuff
+	if attr {
+		buff = &lt.attrBuff
+	}
+
+	buff.Reset()
 	for {
 		curr, err := lt.peekc()
 		if err != nil {
@@ -214,9 +219,9 @@ func (lt *LiteDecoder) name() ([]byte, error) {
 
 		if isNameChar(curr) {
 			lt.clearPeek()
-			lt.buff.WriteByte(curr)
+			buff.WriteByte(curr)
 		} else {
-			return lt.buff.Bytes(), nil
+			return buff.Bytes(), nil
 		}
 	}
 }
