@@ -2,11 +2,11 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"math"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -19,35 +19,60 @@ func main() {
 	}
 	defer f.Close()
 
-	decoder := NewLiteDecoder(f)
-	names := make(map[string]bool)
+	handler := &DebugHandler{
+		names: make(map[string]bool),
+		attrs: make(map[string]bool),
+	}
+	decoder := NewLiteDecoder(f, handler)
 
 	start := time.Now()
 	for i := 0; i < math.MaxInt; i++ {
-		name, err := decoder.Next()
+		err := decoder.Next()
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
-		if name == "" {
-			panic("WTF")
-		}
-		names[name] = true
 	}
 
 	fmt.Printf("elapsed: %v\n", time.Since(start))
-	fmt.Println(names)
+	fmt.Println(handler.names)
+	fmt.Println(handler.attrs)
+}
+
+type DebugHandler struct {
+	names map[string]bool
+	attrs map[string]bool
+}
+
+func (dh *DebugHandler) Name(name []byte) {
+	dh.names[string(name)] = true
+}
+
+func (dh *DebugHandler) AttrName(name []byte) {
+	dh.attrs[string(name)] = true
+}
+
+func (dh *DebugHandler) AttrValue(name []byte) {
+}
+
+type Handler interface {
+	Name(name []byte)
+	AttrName(name []byte)
+	AttrValue(value []byte)
 }
 
 type LiteDecoder struct {
 	reader    *bufio.Reader
+	handler   Handler
 	peekStore int
+	buff      bytes.Buffer
 }
 
-func NewLiteDecoder(reader io.Reader) *LiteDecoder {
+func NewLiteDecoder(reader io.Reader, handler Handler) *LiteDecoder {
 	return &LiteDecoder{
 		reader:    bufio.NewReader(reader),
 		peekStore: -1,
+		handler:   handler,
 	}
 }
 
@@ -76,11 +101,11 @@ func (lt *LiteDecoder) clearPeek() {
 	lt.peekStore = -1
 }
 
-func (lt *LiteDecoder) Next() (string, error) {
+func (lt *LiteDecoder) Next() error {
 	for {
 		curr, err := lt.getc()
 		if err != nil {
-			return "", err
+			return err
 		}
 
 		if curr != '<' {
@@ -89,7 +114,7 @@ func (lt *LiteDecoder) Next() (string, error) {
 
 		curr1, err := lt.peekc()
 		if err != nil {
-			return "", err
+			return err
 		}
 
 		if curr1 == '/' {
@@ -101,33 +126,33 @@ func (lt *LiteDecoder) Next() (string, error) {
 
 		name, err := lt.name()
 		if err != nil {
-			return "", err
+			return err
 		}
+		lt.handler.Name(name)
 
 		lt.space()
 
 		for !lt.isNextSlashOrRightOrErr() {
 			attrName, err := lt.name()
 			if err != nil {
-				return "", err
+				return err
 			}
-
 			if err := lt.eat('='); err != nil {
-				return "", err
+				return err
 			}
+			lt.handler.AttrName(attrName)
 
 			attrValue, err := lt.quote()
 			if err != nil {
-				return "", err
+				return err
 			}
-			// fmt.Println(attrName, attrValue)
-			_, _ = attrName, attrValue
+			lt.handler.AttrValue(attrValue)
 
 			lt.space()
 		}
 
 		lt.skipUntil('>')
-		return name, nil
+		return nil
 	}
 }
 
@@ -160,44 +185,44 @@ func (lt *LiteDecoder) eat(expected byte) error {
 	return nil
 }
 
-func (lt *LiteDecoder) name() (string, error) {
-	var buff strings.Builder
+func (lt *LiteDecoder) name() ([]byte, error) {
+	lt.buff.Reset()
 	for {
 		curr, err := lt.peekc()
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		if isNameChar(curr) {
 			lt.clearPeek()
-			buff.WriteByte(curr)
+			lt.buff.WriteByte(curr)
 		} else {
-			return buff.String(), nil
+			return lt.buff.Bytes(), nil
 		}
 	}
 }
 
-func (lt *LiteDecoder) quote() (string, error) {
+func (lt *LiteDecoder) quote() ([]byte, error) {
 	delim, err := lt.getc()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if delim != '\'' && delim != '"' {
-		return "", fmt.Errorf("expected quote delimiter")
+		return nil, fmt.Errorf("expected quote delimiter")
 	}
 
-	var buff strings.Builder
+	lt.buff.Reset()
 	for {
 		curr, err := lt.getc()
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		if curr != delim {
-			buff.WriteByte(curr)
+			lt.buff.WriteByte(curr)
 		} else {
-			return buff.String(), nil
+			return lt.buff.Bytes(), nil
 		}
 	}
 }
