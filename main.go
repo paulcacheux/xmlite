@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -22,7 +23,7 @@ func main() {
 	names := make(map[string]bool)
 
 	start := time.Now()
-	for {
+	for i := 0; i < math.MaxInt; i++ {
 		name, err := decoder.Next()
 		if err != nil {
 			fmt.Println(err)
@@ -103,6 +104,28 @@ func (lt *LiteDecoder) Next() (string, error) {
 			return "", err
 		}
 
+		lt.space()
+
+		for !lt.isNextSlashOrRightOrErr() {
+			attrName, err := lt.name()
+			if err != nil {
+				return "", err
+			}
+
+			if err := lt.eat('='); err != nil {
+				return "", err
+			}
+
+			attrValue, err := lt.quote()
+			if err != nil {
+				return "", err
+			}
+			// fmt.Println(attrName, attrValue)
+			_, _ = attrName, attrValue
+
+			lt.space()
+		}
+
 		lt.skipUntil('>')
 		return name, nil
 	}
@@ -119,6 +142,22 @@ func (lt *LiteDecoder) skipUntil(target byte) error {
 			return nil
 		}
 	}
+}
+
+func (lt *LiteDecoder) isNextSlashOrRightOrErr() bool {
+	next, err := lt.peekc()
+	return err != nil || next == '/' || next == '>'
+}
+
+func (lt *LiteDecoder) eat(expected byte) error {
+	next, err := lt.getc()
+	if err != nil {
+		return err
+	}
+	if next != expected {
+		return fmt.Errorf("expected `%c` and found `%c`", expected, next)
+	}
+	return nil
 }
 
 func (lt *LiteDecoder) name() (string, error) {
@@ -138,6 +177,47 @@ func (lt *LiteDecoder) name() (string, error) {
 	}
 }
 
+func (lt *LiteDecoder) quote() (string, error) {
+	delim, err := lt.getc()
+	if err != nil {
+		return "", err
+	}
+
+	if delim != '\'' && delim != '"' {
+		return "", fmt.Errorf("expected quote delimiter")
+	}
+
+	var buff strings.Builder
+	for {
+		curr, err := lt.getc()
+		if err != nil {
+			return "", err
+		}
+
+		if curr != delim {
+			buff.WriteByte(curr)
+		} else {
+			return buff.String(), nil
+		}
+	}
+}
+
+func (lt *LiteDecoder) space() error {
+	for {
+		curr, err := lt.peekc()
+		if err != nil {
+			return err
+		}
+
+		if curr == ' ' || curr == '\t' || curr == '\n' || curr == '\r' {
+			lt.clearPeek()
+			continue
+		}
+
+		return nil
+	}
+}
+
 func isNameChar(c byte) bool {
-	return c == ':' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
+	return c == ':' || c == '-' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
 }
