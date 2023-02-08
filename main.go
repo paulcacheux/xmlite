@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"time"
 )
@@ -26,12 +25,8 @@ func main() {
 	decoder := NewLiteDecoder(f, handler)
 
 	start := time.Now()
-	for i := 0; i < math.MaxInt; i++ {
-		err := decoder.Next()
-		if err != nil {
-			fmt.Println(err)
-			break
-		}
+	if err := decoder.Parse(); err != nil {
+		fmt.Println(err)
 	}
 
 	fmt.Printf("elapsed: %v\n", time.Since(start))
@@ -55,10 +50,14 @@ func (dh *DebugHandler) AttrName(name []byte) {
 func (dh *DebugHandler) AttrValue(name []byte) {
 }
 
+func (dh *DebugHandler) Text(value []byte) {
+}
+
 type Handler interface {
 	Name(name []byte)
 	AttrName(name []byte)
 	AttrValue(value []byte)
+	Text(value []byte)
 }
 
 type LiteDecoder struct {
@@ -101,17 +100,34 @@ func (lt *LiteDecoder) clearPeek() {
 	lt.peekStore = -1
 }
 
-func (lt *LiteDecoder) Next() error {
+func (lt *LiteDecoder) Parse() error {
 	for {
-		curr, err := lt.getc()
+		if err := lt.NextToken(); err != nil {
+			return err
+		}
+	}
+}
+
+func (lt *LiteDecoder) NextToken() error {
+	for {
+		curr, err := lt.peekc()
 		if err != nil {
 			return err
 		}
 
 		if curr != '<' {
-			continue
+			cd, err := lt.charData()
+			if err != nil {
+				return err
+			}
+			lt.handler.Text(cd)
+			return nil
 		}
 
+		// handle tag
+		lt.clearPeek()
+
+		// possibly </ or <?
 		curr1, err := lt.peekc()
 		if err != nil {
 			return err
@@ -124,6 +140,7 @@ func (lt *LiteDecoder) Next() error {
 			continue
 		}
 
+		// handle name
 		name, err := lt.name()
 		if err != nil {
 			return err
@@ -132,6 +149,7 @@ func (lt *LiteDecoder) Next() error {
 
 		lt.space()
 
+		// handle attributes
 		for !lt.isNextSlashOrRightOrErr() {
 			attrName, err := lt.name()
 			if err != nil {
@@ -151,8 +169,26 @@ func (lt *LiteDecoder) Next() error {
 			lt.space()
 		}
 
+		// end tag
 		lt.skipUntil('>')
 		return nil
+	}
+}
+
+func (lt *LiteDecoder) charData() ([]byte, error) {
+	lt.buff.Reset()
+	for {
+		curr, err := lt.peekc()
+		if err != nil {
+			return nil, err
+		}
+
+		if curr == '<' {
+			return lt.buff.Bytes(), nil
+		}
+
+		lt.clearPeek()
+		lt.buff.WriteByte(curr)
 	}
 }
 
