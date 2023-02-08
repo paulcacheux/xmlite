@@ -143,7 +143,7 @@ func (lt *LiteDecoder) NextToken() error {
 		}
 
 		// end tag
-		autoclose, err := lt.skipUntilEndTag('>')
+		autoclose, err := lt.skipUntilEndTag('/')
 		if err != nil {
 			return err
 		}
