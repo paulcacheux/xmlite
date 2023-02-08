@@ -3,6 +3,7 @@ package xml
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -64,6 +65,9 @@ func (lt *LiteDecoder) clearPeek() {
 func (lt *LiteDecoder) Parse() error {
 	for {
 		if err := lt.NextToken(); err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
 			return err
 		}
 	}
