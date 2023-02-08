@@ -32,7 +32,7 @@ func NewLiteDecoder(reader io.Reader, handler Handler) *LiteDecoder {
 	if rb, ok := reader.(io.ByteReader); ok {
 		lt.reader = rb
 	} else {
-		lt.reader = bufio.NewReaderSize(reader, 4096*4096)
+		lt.reader = bufio.NewReader(reader)
 	}
 	return lt
 }
