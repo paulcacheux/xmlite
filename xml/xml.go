@@ -8,7 +8,8 @@ import (
 )
 
 type Handler interface {
-	Name(name []byte)
+	StartTag(name []byte)
+	EndTag(name []byte)
 	AttrName(name []byte)
 	AttrValue(value []byte)
 	CharData(value []byte)
@@ -93,7 +94,9 @@ func (lt *LiteDecoder) NextToken() error {
 			return err
 		}
 
+		isEnd := false
 		if curr1 == '/' {
+			isEnd = true
 			lt.clearPeek()
 		} else if curr1 == '?' {
 			lt.skipUntil('>')
@@ -105,28 +108,34 @@ func (lt *LiteDecoder) NextToken() error {
 		if err != nil {
 			return err
 		}
-		lt.handler.Name(name)
+		if isEnd {
+			lt.handler.EndTag(name)
+		} else {
+			lt.handler.StartTag(name)
+		}
 
 		lt.space()
 
 		// handle attributes
-		for !lt.isNextSlashOrRightOrErr() {
-			attrName, err := lt.name()
-			if err != nil {
-				return err
-			}
-			if err := lt.eat('='); err != nil {
-				return err
-			}
-			lt.handler.AttrName(attrName)
+		if !isEnd {
+			for !lt.isNextSlashOrRightOrErr() {
+				attrName, err := lt.name()
+				if err != nil {
+					return err
+				}
+				if err := lt.eat('='); err != nil {
+					return err
+				}
+				lt.handler.AttrName(attrName)
 
-			attrValue, err := lt.quote()
-			if err != nil {
-				return err
-			}
-			lt.handler.AttrValue(attrValue)
+				attrValue, err := lt.quote()
+				if err != nil {
+					return err
+				}
+				lt.handler.AttrValue(attrValue)
 
-			lt.space()
+				lt.space()
+			}
 		}
 
 		// end tag
