@@ -50,14 +50,14 @@ func (dh *DebugHandler) AttrName(name []byte) {
 func (dh *DebugHandler) AttrValue(name []byte) {
 }
 
-func (dh *DebugHandler) Text(value []byte) {
+func (dh *DebugHandler) CharData(value []byte) {
 }
 
 type Handler interface {
 	Name(name []byte)
 	AttrName(name []byte)
 	AttrValue(value []byte)
-	Text(value []byte)
+	CharData(value []byte)
 }
 
 type LiteDecoder struct {
@@ -120,7 +120,7 @@ func (lt *LiteDecoder) NextToken() error {
 			if err != nil {
 				return err
 			}
-			lt.handler.Text(cd)
+			lt.handler.CharData(cd)
 			return nil
 		}
 
