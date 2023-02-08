@@ -103,7 +103,7 @@ func (lt *LiteDecoder) NextToken() error {
 			isEnd = true
 			lt.clearPeek()
 		} else if curr1 == '?' {
-			lt.skipUntil('>')
+			lt.skipUntilEndTag('?')
 			continue
 		}
 
@@ -143,7 +143,15 @@ func (lt *LiteDecoder) NextToken() error {
 		}
 
 		// end tag
-		lt.skipUntil('>')
+		autoclose, err := lt.skipUntilEndTag('>')
+		if err != nil {
+			return err
+		}
+		if autoclose {
+			// name is still valid since we skipped the parsing of attributes
+			lt.handler.EndTag(name)
+		}
+
 		return nil
 	}
 }
@@ -165,16 +173,18 @@ func (lt *LiteDecoder) charData() ([]byte, error) {
 	}
 }
 
-func (lt *LiteDecoder) skipUntil(target byte) error {
+func (lt *LiteDecoder) skipUntilEndTag(before byte) (bool, error) {
+	prev := -1
 	for {
 		curr, err := lt.getc()
 		if err != nil {
-			return err
+			return false, err
 		}
 
-		if curr == target {
-			return nil
+		if curr == '>' {
+			return prev == int(before), nil
 		}
+		prev = int(curr)
 	}
 }
 
