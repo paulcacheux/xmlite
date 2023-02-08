@@ -17,7 +17,9 @@ func TestSmoke(t *testing.T) {
 	}
 	defer f.Close()
 
-	handler := &PkgHandler{}
+	handler := &PkgHandler{
+		tb: t,
+	}
 	decoder := xml.NewLiteDecoder(f, handler)
 
 	start := time.Now()
@@ -26,23 +28,27 @@ func TestSmoke(t *testing.T) {
 	}
 
 	t.Logf("elapsed: %v\n", time.Since(start))
-	t.Log(handler.counter)
 }
 
 type PkgHandler struct {
-	counter int
+	tb    testing.TB
+	stack []string
 }
 
 func (ph *PkgHandler) StartTag(name []byte) {
-	if string(name) == "package" {
-		ph.counter += 1
-	}
+	ph.stack = append(ph.stack, string(name))
 }
 
 func (ph *PkgHandler) EndTag(name []byte) {
-	if string(name) == "package" {
-		ph.counter -= 1
+	last, newStack := ph.stack[len(ph.stack)-1], ph.stack[:len(ph.stack)-1]
+	ph.stack = newStack
+	if last != string(name) {
+		ph.tb.Fatalf("mismatch: `%s` != `%s`", last, string(name))
 	}
+}
+
+func (ph *PkgHandler) AutoEndTag() {
+	ph.stack = ph.stack[:len(ph.stack)-1]
 }
 
 func (ph *PkgHandler) AttrName(name []byte) {
